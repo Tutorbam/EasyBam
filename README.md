@@ -16,6 +16,7 @@
 - [💾 Setup Rapido](#-setup-rapido)
 - [☁️ Deploy Cloud](#️-deploy-cloud)
 - [💻 Installazione Locale](#-installazione-locale)
+- [⚙️ Configurazione Proxy](#️-configurazione-proxy)
 - [🧰 Utilizzo del Proxy](#-utilizzo-del-proxy)
 - [🔧 Configurazione](#-configurazione)
 - [📖 Architettura](#-architettura)
@@ -151,6 +152,33 @@ docker run -d -p 7860:7860 \
   -v $(pwd)/logs:/app/logs \
   --name EasyProxy EasyProxy
 ```
+
+---
+
+## ⚙️ Configurazione Proxy
+
+Il modo più semplice per configurare i proxy è tramite un file `.env`.
+
+1.  **Crea un file `.env`** nella cartella principale del progetto (puoi rinominare il file `.env.example`).
+2.  **Aggiungi le tue variabili proxy** al file `.env`.
+
+**Esempio di file `.env`:**
+
+```env
+# Proxy globale per tutto il traffico
+GLOBAL_PROXY=http://user:pass@myproxy.com:8080
+
+# Proxy multipli per DLHD (uno verrà scelto a caso)
+DLHD_PROXY=socks5://proxy1.com:1080,socks5://proxy2.com:1080
+
+# Proxy specifico per Vavoo
+VAVOO_PROXY=socks5://vavoo-proxy.net:9050
+```
+
+Le variabili supportate sono:
+- `GLOBAL_PROXY`: Proxy di fallback per tutte le richieste.
+- `VAVOO_PROXY`: Proxy specifico per le richieste a Vavoo.
+- `DLHD_PROXY`: Proxy specifico per le richieste a DaddyLiveHD.
 
 ---
 

@@ -3,7 +3,9 @@ import logging
 import time
 import aiohttp
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
+from aiohttp_proxy import ProxyConnector
 from typing import Optional, Dict, Any
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -13,25 +15,36 @@ class ExtractorError(Exception):
 class VavooExtractor:
     """Vavoo URL extractor per risolvere link vavoo.to"""
     
-    def __init__(self, request_headers: dict):
+    def __init__(self, request_headers: dict, proxies: list = None):
         self.request_headers = request_headers
         self.base_headers = {
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
         self.session = None
         self.mediaflow_endpoint = "proxy_stream_endpoint"
+        self.proxies = proxies or []
+
+    def _get_random_proxy(self):
+        """Restituisce un proxy casuale dalla lista."""
+        return random.choice(self.proxies) if self.proxies else None
         
     async def _get_session(self):
         if self.session is None or self.session.closed:
             timeout = ClientTimeout(total=60, connect=30, sock_read=30)
-            connector = TCPConnector(
-                limit=20,
-                limit_per_host=10,
-                keepalive_timeout=60,
-                enable_cleanup_closed=True,
-                force_close=False,
-                use_dns_cache=True
-            )
+            proxy = self._get_random_proxy()
+            if proxy:
+                logger.info(f"Utilizzo del proxy {proxy} per la sessione Vavoo.")
+                connector = ProxyConnector.from_url(proxy)
+            else:
+                connector = TCPConnector(
+                    limit=20,
+                    limit_per_host=10,
+                    keepalive_timeout=60,
+                    enable_cleanup_closed=True,
+                    force_close=False,
+                    use_dns_cache=True
+                )
+
             self.session = ClientSession(
                 timeout=timeout,
                 connector=connector,

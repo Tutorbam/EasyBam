@@ -4,8 +4,10 @@ import re
 import json
 from urllib.parse import urlparse
 from typing import Dict, Any
+import random
 import aiohttp
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
+from aiohttp_proxy import ProxyConnector
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +18,7 @@ class ExtractorError(Exception):
 class VixSrcExtractor:
     """VixSrc URL extractor per risolvere link VixSrc."""
     
-    def __init__(self, request_headers: dict):
+    def __init__(self, request_headers: dict, proxies: list = None):
         self.request_headers = request_headers
         self.base_headers = {
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -28,19 +30,29 @@ class VixSrcExtractor:
         self.session = None
         self.mediaflow_endpoint = "hls_manifest_proxy"
         self._session_lock = asyncio.Lock()
+        self.proxies = proxies or []
+
+    def _get_random_proxy(self):
+        """Restituisce un proxy casuale dalla lista."""
+        return random.choice(self.proxies) if self.proxies else None
 
     async def _get_session(self):
         """Ottiene una sessione HTTP persistente."""
         if self.session is None or self.session.closed:
             timeout = ClientTimeout(total=60, connect=30, sock_read=30)
-            connector = TCPConnector(
-                limit=10,
-                limit_per_host=3,
-                keepalive_timeout=30,
-                enable_cleanup_closed=True,
-                force_close=False,
-                use_dns_cache=True
-            )
+            proxy = self._get_random_proxy()
+            if proxy:
+                logger.info(f"Utilizzo del proxy {proxy} per la sessione VixSrc.")
+                connector = ProxyConnector.from_url(proxy)
+            else:
+                connector = TCPConnector(
+                    limit=10,
+                    limit_per_host=3,
+                    keepalive_timeout=30,
+                    enable_cleanup_closed=True,
+                    force_close=False,
+                    use_dns_cache=True
+                )
             self.session = ClientSession(
                 timeout=timeout,
                 connector=connector,
@@ -179,6 +191,16 @@ class VixSrcExtractor:
             version = None
             response = None
             
+            # ✅ NUOVO: Gestione per URL di playlist che non richiedono estrazione.
+            # Se l'URL è già un manifest, lo restituisce direttamente.
+            if "vixsrc.to/playlist" in url:
+                logger.info("URL è già un manifest VixSrc, non richiede estrazione.")
+                return {
+                    "destination_url": url,
+                    "request_headers": self.base_headers,
+                    "mediaflow_endpoint": self.mediaflow_endpoint,
+                }
+
             if "iframe" in url:
                 # Gestione URL iframe
                 site_url = url.split("/iframe")[0]
