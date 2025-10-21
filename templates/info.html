@@ -684,12 +684,13 @@
                         Proxy universale per streaming multimediale con supporto completo per diversi formati e protocolli.
                     </p>
                     <div class="code-block">Supporta:
-• VIXSRC - VOD VixSrc.to
+• VixSrc - Streaming VOD
+• Sportzonline - Streaming sportivo
 • HLS (.m3u8) - Streaming live e VOD
 • M3U playlist - Liste canali IPTV  
 • MPD (DASH) - Streaming adattivo
 • DLHD streams - Flussi dinamici</div>
-                    <div class="example-block">/proxy/manifest.m3u8?url=https://example.com/stream.m3u8</div>
+                    <div class="example-block">/proxy/manifest.m3u8?url=https://vixsrc.to/movie/...</div>
                 </div>
 
                 <div class="endpoint-card">
@@ -739,6 +740,29 @@
                         </li>
                     </ul>
                 </div>
+                                <div class="endpoint-card">
+                    <div class="endpoint-header">
+                        <span class="endpoint-method">GET</span>
+                        <code class="endpoint-path">/proxy/manifest.m3u8?url=&lt;URL_SPORTSONLINE&gt;</code>
+                    </div>
+                    <p class="endpoint-description">
+                        Risoluzione automatica di stream da Sportsonline/Sportzonline.
+                    </p>
+                    <ul class="feature-list">
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <span>Estrazione automatica di iframe e URL M3U8</span>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <span>Supporto a P.A.C.K.E.R. unpacking</span>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <span>Headers ottimizzati per lo streaming</span>
+                        </li>
+                    </ul>
+                </div>
             </section>
 
             <!-- Caratteristiche Avanzate -->
@@ -784,13 +808,12 @@
                 </div>
 
                 <div style="margin-top: var(--spacing-lg);">
-                    <span class="tag tag-primary">VIXSRC</span>
+                    <span class="tag tag-primary">VixSrc</span>
                     <span class="tag tag-primary">HLS</span>
                     <span class="tag tag-primary">M3U8</span>
                     <span class="tag tag-success">MPD</span>
-                    <span class="tag tag-success">DLHD</span>
                     <span class="tag tag-info">Vavoo</span>
-                    <span class="tag tag-info">DLHD</span>
+                    <span class="tag tag-info">Sportzonline</span>
                     <span class="tag tag-warning">AES-128</span>
                 </div>
             </section>

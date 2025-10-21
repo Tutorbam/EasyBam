@@ -31,6 +31,7 @@ class VixSrcExtractor:
         self.mediaflow_endpoint = "hls_manifest_proxy"
         self._session_lock = asyncio.Lock()
         self.proxies = proxies or []
+        self.is_vixsrc = True # Flag per identificare questo estrattore
 
     def _get_random_proxy(self):
         """Restituisce un proxy casuale dalla lista."""

@@ -195,7 +195,7 @@ class VavooExtractor:
             logger.exception(f"Risoluzione Vavoo fallita per URL {link}: {str(e)}")
             return None
 
-    async def extract(self, url: str) -> Dict[str, Any]:
+    async def extract(self, url: str, **kwargs) -> Dict[str, Any]:
         if "vavoo.to" not in url:
             raise ExtractorError("Non è un URL Vavoo valido")
 

@@ -11,6 +11,19 @@ import aiohttp
 from aiohttp import web
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 from aiohttp_proxy import ProxyConnector
+from dotenv import load_dotenv
+
+load_dotenv() # Carica le variabili dal file .env
+
+# Configurazione logging
+# ✅ CORREZIONE: Imposta un formato standard e assicurati che il logger 'aiohttp.access'
+# non venga silenziato, permettendo la visualizzazione dei log di accesso.
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s:%(name)s:%(message)s'
+)
+
+logger = logging.getLogger(__name__)
 
 # --- Configurazione Proxy ---
 def parse_proxies(proxy_env_var: str) -> list:
@@ -28,17 +41,12 @@ if GLOBAL_PROXIES: logging.info(f"🌍 Caricati {len(GLOBAL_PROXIES)} proxy glob
 if VAVOO_PROXIES: logging.info(f"🎬 Caricati {len(VAVOO_PROXIES)} proxy Vavoo.")
 if DLHD_PROXIES: logging.info(f"📺 Caricati {len(DLHD_PROXIES)} proxy DLHD.")
 
-# Configurazione logging
-logging.basicConfig(level=logging.INFO)
-
-logger = logging.getLogger(__name__)
-
 # Aggiungi path corrente per import moduli
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # --- Moduli Esterni ---
 # Vengono importati singolarmente per un feedback più granulare in caso di errore.
-VavooExtractor, DLHDExtractor, VixSrcExtractor, PlaylistBuilder = None, None, None, None
+VavooExtractor, DLHDExtractor, VixSrcExtractor, PlaylistBuilder, SportsonlineExtractor = None, None, None, None, None
 
 try:
     from vavoo_extractor import VavooExtractor
@@ -63,6 +71,12 @@ try:
     logger.info("✅ Modulo VixSrcExtractor caricato.")
 except ImportError:
     logger.warning("⚠️ Modulo VixSrcExtractor non trovato. Funzionalità VixSrc disabilitata.")
+
+try:
+    from sportsonline_extractor import SportsonlineExtractor
+    logger.info("✅ Modulo SportsonlineExtractor caricato.")
+except ImportError:
+    logger.warning("⚠️ Modulo SportsonlineExtractor non trovato. Funzionalità Sportsonline disabilitata.")
 
 # --- Classi Unite ---
 class ExtractorError(Exception):
@@ -102,8 +116,8 @@ class GenericHLSExtractor:
             )
         return self.session
 
-    async def extract(self, url):
-        # ✅ CORREZIONE: Permette anche gli URL di playlist VixSrc che non hanno estensione.
+    async def extract(self, url, **kwargs):
+        # ✅ CORREZIONE: Permette anche gli URL di playlist VixSrc che non richiedono estensione.
         if not any(pattern in url.lower() for pattern in ['.m3u8', '.mpd', '.ts', 'vixsrc.to/playlist']):
             raise ExtractorError("URL non supportato (richiesto .m3u8, .mpd, .ts o URL VixSrc valido)")
 
@@ -165,6 +179,12 @@ class HLSProxy:
                 if key not in self.extractors:
                     self.extractors[key] = VixSrcExtractor(request_headers, proxies=GLOBAL_PROXIES)
                 return self.extractors[key]
+            elif any(domain in url for domain in ["sportzonline", "sportsonline"]):
+                key = "sportsonline"
+                proxies = GLOBAL_PROXIES
+                if key not in self.extractors:
+                    self.extractors[key] = SportsonlineExtractor(request_headers, proxies=proxies)
+                return self.extractors[key]
             else:
                 raise ExtractorError("Tipo di URL non supportato")
         except (NameError, TypeError) as e:
@@ -175,6 +195,7 @@ class HLSProxy:
         extractor = None
         try:
             target_url = request.query.get('url')
+            force_refresh = request.query.get('force', 'false').lower() == 'true'
             if not target_url:
                 return web.Response(text="Parametro 'url' mancante", status=400)
             
@@ -183,13 +204,16 @@ class HLSProxy:
             except:
                 pass
                 
-            logger.info(f"Richiesta proxy per URL: {target_url}")
+            log_message = f"Richiesta proxy per URL: {target_url}"
+            if force_refresh:
+                log_message += " (Refresh forzato)"
+            logger.info(log_message)
             
             extractor = await self.get_extractor(target_url, dict(request.headers))
             
             try:
-                # Primo tentativo con la cache (se disponibile)
-                result = await extractor.extract(target_url)
+                # Passa il flag force_refresh all'estrattore
+                result = await extractor.extract(target_url, force_refresh=force_refresh)
                 stream_url = result["destination_url"]
                 stream_headers = result.get("request_headers", {})
                 
@@ -202,10 +226,8 @@ class HLSProxy:
                 logger.info(f"Stream URL risolto: {stream_url}")
                 return await self._proxy_stream(request, stream_url, stream_headers)
             except ExtractorError as e:
-                logger.warning(f"Estrazione fallita, tento di nuovo forzando l'aggiornamento della cache: {e}")
-                # Se il primo tentativo fallisce (magari con dati cache non validi),
-                # riprova forzando un refresh.
-                result = await extractor.extract(target_url, force_refresh=True)
+                logger.warning(f"Estrazione fallita, tento di nuovo forzando l'aggiornamento: {e}")
+                result = await extractor.extract(target_url, force_refresh=True) # Forza sempre il refresh al secondo tentativo
                 stream_url = result["destination_url"]
                 stream_headers = result.get("request_headers", {})
                 logger.info(f"Stream URL risolto dopo refresh: {stream_url}")
@@ -258,12 +280,24 @@ class HLSProxy:
             logger.info(f"🔑 Fetching AES key from: {key_url}")
             logger.debug(f"   -> with headers: {headers}")
             
-            proxy = random.choice(GLOBAL_PROXIES) if GLOBAL_PROXIES else None
+            # ✅ CORREZIONE: Seleziona il proxy corretto (DLHD, Vavoo, etc.) in base all'URL originale.
+            # Se non c'è un proxy specifico, usa quello globale come fallback.
+            proxy_list = GLOBAL_PROXIES
+            original_channel_url = request.query.get('original_channel_url')
+
+            # Se l'URL della chiave è un dominio newkso.ru o l'URL originale è di DLHD, usa il proxy DLHD.
+            if "newkso.ru" in key_url or (original_channel_url and any(domain in original_channel_url for domain in ["daddylive", "dlhd"])):
+                proxy_list = DLHD_PROXIES or GLOBAL_PROXIES
+            # Altrimenti, se è un URL Vavoo, usa il proxy Vavoo.
+            elif original_channel_url and "vavoo.to" in original_channel_url:
+                proxy_list = VAVOO_PROXIES or GLOBAL_PROXIES
+            
+            proxy = random.choice(proxy_list) if proxy_list else None
             connector_kwargs = {}
             if proxy:
                 connector_kwargs['proxy'] = proxy
                 logger.info(f"Utilizzo del proxy {proxy} per la richiesta della chiave.")
-
+            
             timeout = ClientTimeout(total=30)
             async with ClientSession(timeout=timeout) as session:
                 async with session.get(key_url, headers=headers, **connector_kwargs) as resp:
@@ -282,6 +316,18 @@ class HLSProxy:
                         )
                     else:
                         logger.error(f"❌ Key fetch failed with status: {resp.status}")
+                        # --- LOGICA DI INVALIDAZIONE AUTOMATICA ---
+                        # Se il recupero della chiave fallisce, è probabile che la cache
+                        # dell'estrattore sia obsoleta. Invalidiamola.
+                        try:
+                            url_param = request.query.get('original_channel_url') # ✅ CORREZIONE: Usa il parametro corretto
+                            if url_param:
+                                extractor = await self.get_extractor(url_param, {})
+                                if hasattr(extractor, 'invalidate_cache_for_url'):
+                                    await extractor.invalidate_cache_for_url(url_param)
+                        except Exception as cache_e:
+                            logger.error(f"⚠️ Errore durante l'invalidazione automatica della cache: {cache_e}")
+                        # --- FINE LOGICA ---
                         return web.Response(text=f"Key fetch failed: {resp.status}", status=resp.status)
                         
         except Exception as e:
@@ -393,10 +439,11 @@ class HLSProxy:
                         scheme = request.headers.get('X-Forwarded-Proto', request.scheme)
                         host = request.headers.get('X-Forwarded-Host', request.host)
                         proxy_base = f"{scheme}://{host}"
+                        original_channel_url = request.query.get('url', '')
                         logger.info(f"Costruzione URL proxy basata su: {proxy_base}")
                         
-                        rewritten_manifest = self._rewrite_manifest_urls(
-                            manifest_content, stream_url, proxy_base, headers
+                        rewritten_manifest = await self._rewrite_manifest_urls(
+                            manifest_content, stream_url, proxy_base, headers, original_channel_url
                         )
                         
                         return web.Response(
@@ -494,12 +541,53 @@ class HLSProxy:
             logger.error(f"❌ Errore durante la riscrittura del manifest MPD: {e}")
             return manifest_content # Restituisce il contenuto originale in caso di errore
 
-    def _rewrite_manifest_urls(self, manifest_content: str, base_url: str, proxy_base: str, stream_headers: dict) -> str:
+    async def _rewrite_manifest_urls(self, manifest_content: str, base_url: str, proxy_base: str, stream_headers: dict, original_channel_url: str = '') -> str:
         """✅ AGGIORNATA: Riscrive gli URL nei manifest HLS per passare attraverso il proxy (incluse chiavi AES)"""
         lines = manifest_content.split('\n')
         rewritten_lines = []
         
-        # Prepara gli header da passare come parametri URL
+        # ✅ NUOVO: Logica speciale per VixSrc
+        # Determina se l'URL base è di VixSrc per applicare la logica personalizzata.
+        is_vixsrc_stream = False
+        try:
+            # Usiamo l'URL originale della richiesta per determinare l'estrattore
+            # Questo è più affidabile di `base_url` che potrebbe essere già un URL di playlist.
+            original_request_url = stream_headers.get('referer', base_url)
+            extractor = await self.get_extractor(original_request_url, {})
+            if hasattr(extractor, 'is_vixsrc') and extractor.is_vixsrc:
+                is_vixsrc_stream = True
+                logger.info("Rilevato stream VixSrc. Applicherò la logica di filtraggio qualità e non-proxy.")
+        except Exception:
+            # Se l'estrattore non viene trovato, procedi normalmente.
+            pass
+
+        if is_vixsrc_stream:
+            streams = []
+            for i, line in enumerate(lines):
+                if line.startswith('#EXT-X-STREAM-INF:'):
+                    bandwidth_match = re.search(r'BANDWIDTH=(\d+)', line)
+                    if bandwidth_match:
+                        bandwidth = int(bandwidth_match.group(1))
+                        streams.append({'bandwidth': bandwidth, 'inf': line, 'url': lines[i+1]})
+            
+            if streams:
+                # Filtra per la qualità più alta
+                highest_quality_stream = max(streams, key=lambda x: x['bandwidth'])
+                logger.info(f"VixSrc: Trovata qualità massima con bandwidth {highest_quality_stream['bandwidth']}.")
+                
+                # Ricostruisci il manifest solo con la qualità più alta e gli URL originali
+                rewritten_lines.append('#EXTM3U')
+                for line in lines:
+                    if line.startswith('#EXT-X-MEDIA:') or line.startswith('#EXT-X-STREAM-INF:') or (line and not line.startswith('#')):
+                        continue # Salta i vecchi tag di stream e media
+                
+                # Aggiungi i tag media e lo stream di qualità più alta
+                rewritten_lines.extend([line for line in lines if line.startswith('#EXT-X-MEDIA:')])
+                rewritten_lines.append(highest_quality_stream['inf'])
+                rewritten_lines.append(highest_quality_stream['url'])
+                return '\n'.join(rewritten_lines)
+
+        # Logica standard per tutti gli altri stream
         header_params = "".join([f"&h_{urllib.parse.quote(key)}={urllib.parse.quote(value)}" for key, value in stream_headers.items() if key.lower() in ['user-agent', 'referer', 'origin', 'authorization']])
 
         for line in lines:
@@ -519,19 +607,19 @@ class HLSProxy:
                     
                     # Crea URL proxy per la chiave
                     encoded_key_url = urllib.parse.quote(absolute_key_url, safe='')
-                    proxy_key_url = f"{proxy_base}/key?key_url={encoded_key_url}"
+                    # ✅ AGGIUNTO: Passa l'URL originale del canale per l'invalidazione della cache
+                    encoded_original_channel_url = urllib.parse.quote(original_channel_url, safe='')
+                    proxy_key_url = f"{proxy_base}/key?key_url={encoded_key_url}&original_channel_url={encoded_original_channel_url}"
 
                     # Aggiungi gli header necessari come parametri h_
                     # Questo permette al gestore della chiave di usare il contesto corretto
-                    key_req_headers = {}
-                    for h_name in ['Referer', 'Origin', 'User-Agent']:
-                        if h_name in stream_headers:
-                            # Usa h_User_Agent per evitare conflitti con trattini
-                            param_name = f"h_{h_name.replace('-', '_')}"
-                            key_req_headers[param_name] = stream_headers[h_name]
-                    
-                    if key_req_headers:
-                        proxy_key_url += "&" + urllib.parse.urlencode(key_req_headers)
+                    # ✅ CORREZIONE: Passa tutti gli header rilevanti alla richiesta della chiave
+                    # per garantire l'autenticazione corretta.
+                    key_header_params = "".join(
+                        [f"&h_{urllib.parse.quote(key)}={urllib.parse.quote(value)}" 
+                         for key, value in stream_headers.items() if key.lower() in ['user-agent', 'referer', 'origin', 'authorization']]
+                    )
+                    proxy_key_url += key_header_params
                     
                     # Sostituisci l'URI nel tag EXT-X-KEY
                     new_line = line[:uri_start] + proxy_key_url + line[uri_end:]
@@ -699,6 +787,7 @@ class HLSProxy:
                 "vavoo_extractor": VavooExtractor is not None,
                 "dlhd_extractor": DLHDExtractor is not None,
                 "vixsrc_extractor": VixSrcExtractor is not None,
+                "sportsonline_extractor": SportsonlineExtractor is not None,
             },
             "proxy_config": {
                 "global": f"{len(GLOBAL_PROXIES)} proxies caricati",
@@ -777,8 +866,7 @@ def main():
     web.run_app(
         app, # Usa l'istanza aiohttp originale per il runner integrato
         host='0.0.0.0',
-        port=7860,
-        access_log=logger
+        port=7860
     )
 
 if __name__ == '__main__':

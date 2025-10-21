@@ -27,7 +27,7 @@
 
 | 🎯 **Proxy Universale** | 🔐 **Estrattori Specializzati** | ⚡ **Performance** |
 |------------------------|------------------------|-------------------|
-| HLS, M3U8, MPD, DLHD streams, VIXSRC | Vavoo, DaddyLive HD integrati | Connessioni async e keep-alive |
+| HLS, M3U8, MPD, DLHD streams, VIXSRC | Vavoo, DLHD, Sportsonline, VixSrc | Connessioni async e keep-alive |
 
 | 🌐 **Multi-formato** | 🔄 **Retry Logic** | 🚀 **Scalabilità** |
 |--------------------|-------------------|------------------|
@@ -204,6 +204,7 @@ http://<server-ip>:7860/proxy/manifest.m3u8?url=<URL_STREAM>
 - **MPD (DASH)** - Streaming adattivo
 - **DLHD streams** - Flussi dinamici
 - **VIXSRC** - Streaming VOD
+- **Sportsonline** - Streaming sportivo
 
 **Esempi:**
 ```bash
@@ -230,6 +231,13 @@ http://server:7860/proxy/manifest.m3u8?url=https://stream.com/video.m3u8&h_user-
 - Risoluzione link DaddyLive HD
 - Bypass automatico restrizioni
 - Ottimizzazione qualità stream
+
+### ⚽ Risoluzione Sportsonline/Sportzonline Automatico
+
+**Funzionalità:**
+- Risoluzione link da `sportsonline.*` e `sportzonline.*`
+- Estrazione automatica da iframe
+- Supporto per decodifica Javascript (P.A.C.K.E.R.)
 
 ### 🔗 Playlist Builder
 
