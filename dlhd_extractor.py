@@ -428,12 +428,26 @@ class DLHDExtractor:
                 try:
                     await self._make_robust_request(auth_url, headers=auth_headers, retries=1)
                 except Exception as auth_error:
-                    logger.warning(f"Richiesta di autenticazione fallita: {auth_error}.")
-                    if channel_id in self._stream_data_cache:
-                        del self._stream_data_cache[channel_id]
-                        logger.info(f"Cache per il canale {channel_id} invalidata; nuovo tentativo in corso.")
+                    error_msg = str(auth_error).lower()
+                    # ✅ GESTIONE SPECIFICA ERRORE 418: Timestamp scaduto
+                    if "418" in error_msg or "i'm a teapot" in error_msg:
+                        logger.warning(f"⚠️ Errore 418 rilevato (timestamp scaduto) per canale {channel_id}. Forza refresh completo...")
+                        # Invalida sempre la cache per errore 418 e ritenta con dati freschi
+                        if channel_id in self._stream_data_cache:
+                            del self._stream_data_cache[channel_id]
+                            self._save_cache()
+                            logger.info(f"🗑️ Cache invalidata per errore 418 su canale {channel_id}")
+                        # Forza un nuovo tentativo con estrazione completa (non dalla cache)
+                        logger.info(f"🔄 Retry automatico per canale {channel_id} dopo errore 418")
                         return await get_stream_data(baseurl, initial_url, channel_id)
-                    raise ExtractorError(f"Autenticazione fallita: {auth_error}")
+                    else:
+                        # Per altri errori, comportamento esistente
+                        logger.warning(f"Richiesta di autenticazione fallita: {auth_error}.")
+                        if channel_id in self._stream_data_cache:
+                            del self._stream_data_cache[channel_id]
+                            logger.info(f"Cache per il canale {channel_id} invalidata; nuovo tentativo in corso.")
+                            return await get_stream_data(baseurl, initial_url, channel_id)
+                        raise ExtractorError(f"Autenticazione fallita: {auth_error}")
                 
                 # Fase 5: Server lookup
                 server_lookup_path = None # Riscritto per essere più robusto
