@@ -28,6 +28,8 @@
 | 🎯 **Proxy Universale** | 🔐 **Estrattori Specializzati** | ⚡ **Performance** |
 |------------------------|------------------------|-------------------|
 | HLS, M3U8, MPD, DLHD streams, VIXSRC | Vavoo, DLHD, Sportsonline, VixSrc | Connessioni async e keep-alive |
+| **🔓 DRM Decryption** | **🎬 MPD to HLS** | **🔑 ClearKey Support** |
+| CENC decryption con PyCryptodome | Conversione automatica DASH → HLS | Server-side ClearKey per VLC |
 
 | 🌐 **Multi-formato** | 🔄 **Retry Logic** | 🚀 **Scalabilità** |
 |--------------------|-------------------|------------------|
@@ -201,7 +203,8 @@ http://<server-ip>:7860/proxy/manifest.m3u8?url=<URL_STREAM>
 **Supporta:**
 - **HLS (.m3u8)** - Streaming live e VOD
 - **M3U playlist** - Liste canali IPTV  
-- **MPD (DASH)** - Streaming adattivo
+- **MPD (DASH)** - Streaming adattivo con conversione automatica HLS
+- **MPD + ClearKey DRM** - Decrittazione server-side CENC (VLC compatible)
 - **DLHD streams** - Flussi dinamici
 - **VIXSRC** - Streaming VOD
 - **Sportsonline** - Streaming sportivo
@@ -210,6 +213,9 @@ http://<server-ip>:7860/proxy/manifest.m3u8?url=<URL_STREAM>
 ```bash
 # Stream HLS generico
 http://server:7860/proxy/manifest.m3u8?url=https://example.com/stream.m3u8
+
+# MPD con ClearKey DRM (decrittazione server-side)
+http://server:7860/proxy/manifest.m3u8?url=https://cdn.com/stream.mpd&clearkey=KID:KEY
 
 # Playlist IPTV
 http://server:7860/playlist?url=https://iptv-provider.com/playlist.m3u
@@ -249,6 +255,7 @@ http://<server-ip>:7860/builder
 - ✅ Combinare playlist multiple
 - ✅ Gestione automatica Vavoo e DLHD
 - ✅ Supporto #EXTVLCOPT e #EXTHTTP  
+- ✅ Estrazione automatica #KODIPROP ClearKey
 - ✅ Proxy automatico per tutti gli stream
 - ✅ Compatibilità VLC, Kodi, IPTV players
 
