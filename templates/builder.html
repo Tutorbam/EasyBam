@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HLS Proxy - Playlist Builder</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            /* Dark Theme Colors */
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-tertiary: #16213e;
+            --bg-card: rgba(26, 26, 46, 0.8);
+            --surface: rgba(255, 255, 255, 0.05);
+            --surface-glass: rgba(255, 255, 255, 0.08);
+            --surface-elevated: rgba(255, 255, 255, 0.12);
+
+            /* Modern Dark Gradients */
+            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            --secondary-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+            --accent-gradient: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+            --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            --danger-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            --neon-gradient: linear-gradient(90deg, #00f5ff, #bf00ff, #ffff00, #bf00ff, #00f5ff);
+
+            /* Accent Colors */
+            --accent-primary: #6366f1;
+            --accent-secondary: #8b5cf6;
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-error: #ef4444;
+            --accent-info: #06b6d4;
+            --neon-blue: #00f5ff;
+            --neon-purple: #bf00ff;
+            --neon-green: #39ff14;
+
+            /* Text Colors */
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --text-accent: #e4e4e7;
+            --text-inverse: #0f0f23;
+
+            /* Input & Form Colors */
+            --input-bg: rgba(255, 255, 255, 0.05);
+            --input-border: rgba(255, 255, 255, 0.1);
+            --input-border-focus: rgba(99, 102, 241, 0.5);
+            --input-placeholder: #71717a;
+
+            /* Border & Shadow */
+            --border-primary: rgba(255, 255, 255, 0.1);
+            --border-accent: rgba(255, 255, 255, 0.2);
+            --glow-primary: 0 0 20px rgba(99, 102, 241, 0.3);
+            --glow-secondary: 0 0 30px rgba(139, 92, 246, 0.4);
+            --glow-success: 0 0 20px rgba(16, 185, 129, 0.4);
+            --glow-neon: 0 0 40px rgba(0, 245, 255, 0.6);
+            --shadow-dark: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+            --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+            /* Animation */
+            --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-normal: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+
+            /* Measurements */
+            --border-radius: 12px;
+            --border-radius-large: 20px;
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+            --spacing-2xl: 3rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 50%);
+            animation: backgroundFloat 25s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes backgroundFloat {
+
+            0%,
+            100% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+
+            33% {
+                transform: translateY(-20px) rotate(1deg) scale(1.02);
+            }
+
+            66% {
+                transform: translateY(20px) rotate(-1deg) scale(0.98);
+            }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--spacing-lg);
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: var(--spacing-2xl);
+            padding: var(--spacing-xl) 0;
+        }
+
+        .main-title {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 700;
+            background: var(--neon-gradient);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: var(--spacing-md);
+            animation: gradientShift 4s ease-in-out infinite;
+        }
+
+        @keyframes gradientShift {
+
+            0%,
+            100% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        .main-subtitle {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            max-width: 800px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-2xl);
+            align-items: start;
+        }
+
+        .left-panel,
+        .right-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--border-radius-large);
+            padding: var(--spacing-xl);
+            backdrop-filter: blur(20px);
+            box-shadow: var(--shadow-card);
+            transition: var(--transition-normal);
+        }
+
+        .left-panel:hover,
+        .right-panel:hover {
+            border-color: var(--border-accent);
+            box-shadow: var(--shadow-card), var(--glow-primary);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: var(--spacing-lg);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .section-icon {
+            padding: var(--spacing-sm);
+            border-radius: var(--spacing-sm);
+            background: var(--primary-gradient);
+            font-size: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: var(--spacing-sm);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .input-group {
+            position: relative;
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+
+        .form-input {
+            flex: 1;
+            padding: var(--spacing-md);
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: var(--transition-normal);
+            backdrop-filter: blur(10px);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--input-border-focus);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1), var(--glow-primary);
+            background: var(--surface-elevated);
+        }
+
+        .form-input::placeholder {
+            color: var(--input-placeholder);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-md) var(--spacing-lg);
+            border: none;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: var(--transition-normal);
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+            min-width: 120px;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: var(--transition-fast);
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: var(--primary-gradient);
+            color: white;
+            box-shadow: var(--glow-primary);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--glow-secondary);
+        }
+
+        .btn-success {
+            background: var(--success-gradient);
+            color: white;
+            box-shadow: var(--glow-success);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+        }
+
+        .btn-secondary {
+            background: var(--surface-glass);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
+            backdrop-filter: blur(20px);
+        }
+
+        .btn-secondary:hover {
+            background: var(--surface-elevated);
+            border-color: var(--border-accent);
+            transform: translateY(-2px);
+        }
+
+        .btn-icon-only {
+            min-width: auto;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border-radius: var(--spacing-sm);
+        }
+
+        .playlist-item {
+            background: var(--surface);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--border-radius);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-sm);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: var(--transition-normal);
+            animation: slideInLeft 0.4s ease-out;
+        }
+
+        .playlist-item:hover {
+            background: var(--surface-elevated);
+            border-color: var(--border-accent);
+            transform: translateX(4px);
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .playlist-url {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            word-break: break-all;
+            margin-right: var(--spacing-sm);
+        }
+
+        .features-section {
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .feature-badge {
+            background: var(--surface-glass);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--border-radius);
+            padding: var(--spacing-sm) var(--spacing-md);
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            backdrop-filter: blur(10px);
+            transition: var(--transition-normal);
+        }
+
+        .feature-badge:hover {
+            background: var(--surface-elevated);
+            color: var(--text-primary);
+            transform: scale(1.02);
+        }
+
+        .examples-section {
+            margin-top: var(--spacing-xl);
+        }
+
+        .examples-list {
+            background: var(--surface);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--border-radius);
+            padding: var(--spacing-lg);
+            margin-top: var(--spacing-md);
+        }
+
+        .example-item {
+            display: flex;
+            align-items: center;
+            padding: var(--spacing-sm) 0;
+            border-bottom: 1px solid var(--border-primary);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .example-item:last-child {
+            border-bottom: none;
+        }
+
+        .example-bullet {
+            color: var(--accent-primary);
+            margin-right: var(--spacing-sm);
+            font-weight: bold;
+        }
+
+        .output-section {
+            position: relative;
+        }
+
+        .output-content {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--border-radius);
+            padding: 0;
+            /* Removed padding to let children control it */
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-y: auto;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .output-placeholder {
+            color: var(--text-muted);
+            font-style: italic;
+            text-align: center;
+            padding: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .output-placeholder-icon {
+            font-size: 2rem;
+            opacity: 0.5;
+        }
+
+        .loading-spinner {
+            display: none;
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--surface);
+            border-top: 3px solid var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: var(--spacing-xl) auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .copy-notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: var(--success-gradient);
+            color: white;
+            padding: var(--spacing-lg) var(--spacing-xl);
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            box-shadow: var(--shadow-dark);
+            z-index: 1000;
+            transition: var(--transition-normal);
+        }
+
+        .copy-notification.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .generated-link {
+            padding: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .link-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            word-break: break-all;
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            padding: var(--spacing-sm);
+            border-radius: 4px;
+            border: 1px solid var(--border-primary);
+        }
+
+        .link-label {
+            color: var(--accent-success);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-xl);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: var(--spacing-md);
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .input-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .generated-link {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--surface-elevated);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-accent);
+        }
+
+        /* Custom animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .pulse-success {
+            animation: pulseSuccess 0.6s ease-in-out;
+        }
+
+        @keyframes pulseSuccess {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+                box-shadow: var(--glow-success);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="main-title">Playlist Builder</h1>
+            <p class="main-subtitle">Combina multiple playlist IPTV generando un link unificato per l'endpoint /playlist
+            </p>
+        </div>
+
+        <div class="features-section">
+            <div class="features-grid">
+                <div class="feature-badge">🔗 Link unificato /playlist</div>
+                <div class="feature-badge">🔧 Separazione automatica con ;</div>
+                <div class="feature-badge">📺 Formato compatibile con server</div>
+                <div class="feature-badge">🎯 Generazione istantanea</div>
+                <div class="feature-badge">🌐 Supporto URL multipli</div>
+                <div class="feature-badge">📋 Copia con un click</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="left-panel">
+                <h2 class="section-title">
+                    <span class="section-icon">📝</span>
+                    Configurazione Playlist
+                </h2>
+
+                <form id="playlistForm">
+                    <div class="form-group">
+                        <label class="form-label">URL Playlist</label>
+                        <div class="input-group">
+                            <input type="url" id="urlInput" class="form-input"
+                                placeholder="https://provider.com/playlist.m3u8" required>
+                            <button type="button" id="addUrl" class="btn btn-primary btn-icon-only">
+                                ➕
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">API Password (Opzionale)</label>
+                        <div class="input-group">
+                            <input type="password" id="apiPasswordInput" class="form-input"
+                                placeholder="Inserisci la password API se richiesta dal server">
+                        </div>
+                        <small style="color: var(--text-muted); display: block; margin-top: 5px;">
+                            Questa password verrà inclusa nel link generato e usata per autenticare le richieste.
+                        </small>
+                    </div>
+                </form>
+
+                <div class="form-group">
+                    <label class="form-label">Playlist Aggiunte</label>
+                    <div id="playlistList">
+                        <div class="output-placeholder">
+                            <div class="output-placeholder-icon">📋</div>
+                            <p>Nessuna playlist aggiunta</p>
+                            <small>Inserisci gli URL delle playlist e clicca ➕ per aggiungerli</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <button id="clearBtn" class="btn btn-secondary" style="width: 100%;">
+                        <span>🗑️</span>
+                        <span>Pulisci Lista</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="output-section">
+                    <h2 class="section-title">
+                        <span class="section-icon">🔗</span>
+                        Link Generato
+                        <button id="copyBtn" class="btn btn-secondary btn-icon-only" style="margin-left: auto;"
+                            disabled>
+                            📋
+                        </button>
+                    </h2>
+
+                    <div class="loading-spinner" id="loadingSpinner"></div>
+
+                    <div class="output-content" id="outputContent">
+                        <div class="output-placeholder">
+                            <div class="output-placeholder-icon">🔗</div>
+                            <p>Il link combinato apparirà qui</p>
+                            <small>Inserisci gli URL delle playlist per creare il link</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="copy-notification" id="copyNotification">
+        ✅ Link copiato negli appunti!
+    </div>
+
+    <script>
+        class PlaylistBuilder {
+            constructor() {
+                this.playlists = [];
+                this.initializeElements();
+                this.attachEventListeners();
+            }
+
+            initializeElements() {
+                this.urlInput = document.getElementById('urlInput');
+                this.apiPasswordInput = document.getElementById('apiPasswordInput');
+                this.addUrlBtn = document.getElementById('addUrl');
+                this.playlistList = document.getElementById('playlistList');
+                this.clearBtn = document.getElementById('clearBtn');
+                this.outputContent = document.getElementById('outputContent');
+                this.copyBtn = document.getElementById('copyBtn');
+                this.loadingSpinner = document.getElementById('loadingSpinner');
+                this.copyNotification = document.getElementById('copyNotification');
+            }
+
+            attachEventListeners() {
+                this.addUrlBtn.addEventListener('click', () => this.addPlaylist());
+                this.urlInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.addPlaylist();
+                    }
+                });
+                this.apiPasswordInput.addEventListener('input', () => this.generatePlaylistLink());
+                this.clearBtn.addEventListener('click', () => this.clearPlaylists());
+                this.copyBtn.addEventListener('click', () => this.copyToClipboard());
+            }
+
+            addPlaylist() {
+                const url = this.urlInput.value.trim();
+                if (!url) return;
+
+                if (!this.isValidUrl(url)) {
+                    this.showNotification('❌ URL non valido', 'error');
+                    return;
+                }
+
+                // Check if URL already exists (check the url property of objects)
+                if (this.playlists.some(p => p.url === url)) {
+                    this.showNotification('⚠️ URL già presente nella lista', 'warning');
+                    return;
+                }
+
+                this.playlists.push({
+                    url: url,
+                    sort: false,
+                    noProxy: false
+                });
+
+                this.urlInput.value = '';
+                this.updatePlaylistList();
+                this.generatePlaylistLink();
+
+                // Animazione di successo
+                this.addUrlBtn.classList.add('pulse-success');
+                setTimeout(() => {
+                    this.addUrlBtn.classList.remove('pulse-success');
+                }, 600);
+            }
+
+            isValidUrl(string) {
+                try {
+                    const url = new URL(string);
+                    return url.protocol === 'http:' || url.protocol === 'https:';
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            updatePlaylistList() {
+                if (this.playlists.length === 0) {
+                    this.playlistList.innerHTML = `
+                        <div class="output-placeholder">
+                            <div class="output-placeholder-icon">📋</div>
+                            <p>Nessuna playlist aggiunta</p>
+                            <small>Inserisci gli URL delle playlist e clicca ➕ per aggiungerli</small>
+                        </div>
+                    `;
+                    return;
+                }
+
+                this.playlistList.innerHTML = this.playlists.map((item, index) => `
+                    <div class="playlist-item">
+                        <div style="flex: 1; min-width: 0;">
+                            <div class="playlist-url" title="${item.url}">${item.url}</div>
+                            <div style="display: flex; gap: 10px; margin-top: 8px;">
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">
+                                    <input type="checkbox" ${item.sort ? 'checked' : ''} onchange="playlistBuilder.toggleSort(${index})">
+                                    Sort A-Z
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">
+                                    <input type="checkbox" ${item.noProxy ? 'checked' : ''} onchange="playlistBuilder.toggleNoProxy(${index})">
+                                    No Proxy
+                                </label>
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary btn-icon-only" onclick="playlistBuilder.removePlaylist(${index})" style="margin-left: 10px;">
+                            ❌
+                        </button>
+                    </div>
+                `).join('');
+            }
+
+            toggleSort(index) {
+                this.playlists[index].sort = !this.playlists[index].sort;
+                this.generatePlaylistLink();
+            }
+
+            toggleNoProxy(index) {
+                this.playlists[index].noProxy = !this.playlists[index].noProxy;
+                this.generatePlaylistLink();
+            }
+
+            removePlaylist(index) {
+                this.playlists.splice(index, 1);
+                this.updatePlaylistList();
+                this.generatePlaylistLink();
+            }
+
+            generatePlaylistLink() {
+                if (this.playlists.length === 0) {
+                    this.resetOutput();
+                    return;
+                }
+
+                const generatedLink = this.createPlaylistLink();
+                this.displayResult(generatedLink);
+                this.copyBtn.disabled = false;
+            }
+
+            async simulateLoading() {
+                // Breve pausa per UX
+                return new Promise(resolve => {
+                    setTimeout(resolve, 800);
+                });
+            }
+
+            createPlaylistLink() {
+                // Crea il link nel formato /playlist?url=URL1|sort=true|noproxy=false;URL2...
+                const encodedDefinitions = this.playlists.map(p => {
+                    let def = p.url;
+                    if (p.sort) def += '|sort=true';
+                    if (p.noProxy) def += '|noproxy=true';
+                    return encodeURIComponent(def);
+                });
+                const urlString = encodedDefinitions.join(';');
+                const baseUrl = window.location.origin;
+                
+                let finalUrl = `${baseUrl}/playlist?url=${urlString}`;
+                
+                // Aggiungi api_password se presente
+                const apiPassword = this.apiPasswordInput.value.trim();
+                if (apiPassword) {
+                    finalUrl += `&api_password=${encodeURIComponent(apiPassword)}`;
+                }
+                
+                return finalUrl;
+            }
+
+            displayResult(link) {
+                this.outputContent.innerHTML = `
+                    <div class="generated-link fade-in">
+                        <div class="link-text">${link}</div>
+                    </div>
+                `;
+            }
+
+            setLoading(loading) {
+                this.loadingSpinner.style.display = loading ? 'block' : 'none';
+                if (loading) {
+                    this.outputContent.innerHTML = '<div class="output-placeholder"><div class="output-placeholder-icon">⏳</div><p>Generazione link in corso...</p></div>';
+                }
+            }
+
+            async copyToClipboard() {
+                const linkElement = document.querySelector('.link-text');
+                if (!linkElement) return;
+
+                const link = linkElement.textContent;
+
+                try {
+                    await navigator.clipboard.writeText(link);
+                    this.showCopyNotification();
+
+                    // Animazione del bottone
+                    this.copyBtn.classList.add('pulse-success');
+                    setTimeout(() => {
+                        this.copyBtn.classList.remove('pulse-success');
+                    }, 600);
+                } catch (err) {
+                    // Fallback per browser che non supportano clipboard API
+                    this.fallbackCopyTextToClipboard(link);
+                }
+            }
+
+            fallbackCopyTextToClipboard(text) {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+
+                try {
+                    document.execCommand('copy');
+                    this.showCopyNotification();
+                } catch (err) {
+                    this.showNotification('❌ Impossibile copiare negli appunti', 'error');
+                }
+
+                document.body.removeChild(textArea);
+            }
+
+            showCopyNotification() {
+                this.copyNotification.classList.add('show');
+                setTimeout(() => {
+                    this.copyNotification.classList.remove('show');
+                }, 2000);
+            }
+
+            clearPlaylists() {
+                this.playlists = [];
+                this.updatePlaylistList();
+                this.resetOutput();
+                this.showNotification('🗑️ Lista playlist pulita', 'info');
+            }
+
+            resetOutput() {
+                this.outputContent.innerHTML = `
+                    <div class="output-placeholder">
+                        <div class="output-placeholder-icon">🔗</div>
+                        <p>Il link combinato apparirà qui</p>
+                        <small>Inserisci gli URL delle playlist e clicca "Genera Link" per creare il link unificato</small>
+                    </div>
+                `;
+                this.copyBtn.disabled = true;
+            }
+
+            showError(message) {
+                this.outputContent.innerHTML = `
+                    <div class="output-placeholder">
+                        <div class="output-placeholder-icon">❌</div>
+                        <p>Errore</p>
+                        <small>${message}</small>
+                    </div>
+                `;
+                this.showNotification('❌ ' + message, 'error');
+            }
+
+            showNotification(message, type = 'info') {
+                // Implementazione semplificata per ora
+                console.log(`${type.toUpperCase()}: ${message}`);
+            }
+        }
+
+        // Inizializzazione
+        const playlistBuilder = new PlaylistBuilder();
+
+        // Effetti di interattività aggiuntivi
+        document.addEventListener('DOMContentLoaded', function () {
+            // Effetto hover sulle card
+            const cards = document.querySelectorAll('.left-panel, .right-panel');
+
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', function () {
+                    this.style.transform = 'translateY(-4px)';
+                });
+
+                card.addEventListener('mouseleave', function () {
+                    this.style.transform = 'translateY(0)';
+                });
+            });
+
+            // Animazione dei badge delle feature
+            const badges = document.querySelectorAll('.feature-badge');
+            badges.forEach((badge, index) => {
+                badge.style.animationDelay = `${index * 0.1}s`;
+                badge.classList.add('fade-in');
+            });
+        });
+    </script>
+</body>
+
+</html>
