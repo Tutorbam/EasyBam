@@ -1,6 +1,0 @@
-aiohttp
-aiohttp-proxy
-gunicorn
-python-dotenv
-zstandard
-pycryptodome
